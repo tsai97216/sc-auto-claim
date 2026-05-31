@@ -17,19 +17,14 @@ async function notify(claimed, accountName) {
           {
             name: "👤 帳號",
             value: accountName,
-            inline: true
+            inline: false
           },
           {
             name: "🎁 結果",
             value: isSuccess
               ? `成功領取 ${claimed} 個`
               : "沒有可領取獎勵",
-            inline: true
-          },
-          {
-            name: "✨ 狀態",
-            value: isSuccess ? "SUCCESS" : "EMPTY",
-            inline: true
+            inline: false
           }
         ],
         footer: {
