@@ -1,6 +1,7 @@
 const { chromium } = require('playwright');
 
 const DISCORD_WEBHOOK = process.env.DISCORD_WEBHOOK;
+const ACCOUNT_NAME = process.env.ACCOUNT_NAME || "Unknown";
 
 async function notify(msg) {
   if (!DISCORD_WEBHOOK) return;
@@ -11,7 +12,9 @@ async function notify(msg) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ content: msg })
     });
-  } catch {}
+  } catch (e) {
+    console.log("Discord notify failed");
+  }
 }
 
 (async () => {
@@ -26,14 +29,19 @@ async function notify(msg) {
 
     const page = await context.newPage();
 
-    await page.goto('https://store.supercell.com/brawlstars');
+    await page.goto('https://store.supercell.com/brawlstars', {
+      waitUntil: 'networkidle'
+    });
 
     await page.waitForTimeout(5000);
+
+    console.log(`👉 [${ACCOUNT_NAME}] 開始掃描`);
 
     const buttons = await page.$$('button');
 
     for (const btn of buttons) {
       let text = '';
+
       try {
         text = await btn.innerText();
       } catch {
@@ -53,13 +61,16 @@ async function notify(msg) {
       }
     }
 
-    console.log(`完成：${claimed}`);
+    console.log(`✅ [${ACCOUNT_NAME}] 完成：${claimed}`);
 
-    await notify(`🎮 自動領取完成：${claimed}`);
+    await notify(
+      `🎮 ${ACCOUNT_NAME} 自動領取完成：${claimed} 個`
+    );
 
-  } catch (e) {
-    console.log("錯誤", e);
-    await notify("❌ 自動領取失敗");
+  } catch (err) {
+    console.log("❌ error", err);
+
+    await notify(`❌ ${ACCOUNT_NAME} 領取失敗`);
   } finally {
     await browser.close();
   }
