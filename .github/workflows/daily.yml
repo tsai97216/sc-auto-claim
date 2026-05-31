@@ -38,7 +38,7 @@ jobs:
       - name: Run claim A
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-          ACCOUNT_NAME: "帳號1"
+          ACCOUNT_NAME: "各位原住民同胞大家好"
         run: node claim.js
 
       # =========================
@@ -50,5 +50,5 @@ jobs:
       - name: Run claim B
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-          ACCOUNT_NAME: "帳號2"
+          ACCOUNT_NAME: "食不食油餅"
         run: node claim.js
