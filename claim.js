@@ -27,13 +27,11 @@ function saveState(state) {
 function getGameDay() {
   const now = new Date();
 
-  // 台灣時間（UTC+8）
   const taiwanOffset = 8 * 60 * 60 * 1000;
   const local = new Date(now.getTime() + taiwanOffset);
 
   const hour = local.getUTCHours();
 
-  // 如果還沒到16:00 → 算前一天的game_day
   if (hour < 16) {
     local.setDate(local.getDate() - 1);
   }
@@ -44,16 +42,14 @@ function getGameDay() {
 // ----------------------
 // Discord notify
 // ----------------------
-async function notify(claimed, accountName) {
+async function notify(claimed, accountName, isSuccess) {
   if (!DISCORD_WEBHOOK) return;
-
-  const isSuccess = claimed > 0;
 
   const payload = {
     embeds: [
       {
         title: "🎮 荒野亂鬥自動領取",
-        color: isSuccess ? 0x2ecc71 : 0x95a5a6,
+        color: isSuccess ? 0x2ecc71 : 0xe74c3c,
         fields: [
           {
             name: "👤 帳號",
@@ -64,7 +60,7 @@ async function notify(claimed, accountName) {
             name: "🎁 結果",
             value: isSuccess
               ? `成功領取 ${claimed} 個`
-              : "沒有可領取獎勵",
+              : "沒有可領取獎勵（監控中）",
             inline: false
           }
         ],
@@ -96,9 +92,15 @@ async function notify(claimed, accountName) {
   const state = loadState();
   const gameDay = getGameDay();
 
-  // 🟢 防止 Discord 爆炸（核心）
-  const alreadyNotified =
-    state.gameDay === gameDay && state.notified === true;
+  const isNewDay = state.gameDay !== gameDay;
+
+  if (isNewDay) {
+    state.gameDay = gameDay;
+    state.success = false;
+    saveState(state);
+  }
+
+  const alreadySuccess = state.success === true;
 
   const browser = await chromium.launch({ headless: true });
 
@@ -143,26 +145,31 @@ async function notify(claimed, accountName) {
 
     console.log(`✅ [${ACCOUNT_NAME}] 完成：${claimed}`);
 
-    // ----------------------
-    // 🧠 核心控制：只發一次 DC
-    // ----------------------
     const isSuccess = claimed > 0;
 
-    if (isSuccess && !alreadyNotified) {
-      await notify(claimed, ACCOUNT_NAME);
+    // ----------------------
+    // 🟢 成功邏輯（只發一次）
+    // ----------------------
+    if (isSuccess && !alreadySuccess) {
+      await notify(claimed, ACCOUNT_NAME, true);
 
-      state.gameDay = gameDay;
-      state.notified = true;
+      state.success = true;
       saveState(state);
     }
 
-    // ❌ 沒成功 or 已通知 → 不動 state、不刷 DC
+    // ----------------------
+    // 🔴 失敗邏輯（持續監控）
+    // ----------------------
+    if (!isSuccess && !alreadySuccess) {
+      await notify(0, ACCOUNT_NAME, false);
+    }
 
   } catch (err) {
     console.log("❌ error", err);
 
-    // 失敗不影響通知鎖（避免卡死）
-    await notify(0, ACCOUNT_NAME);
+    if (!alreadySuccess) {
+      await notify(0, ACCOUNT_NAME, false);
+    }
 
   } finally {
     await browser.close();
