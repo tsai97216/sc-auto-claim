@@ -1,31 +1,24 @@
 name: daily-claim
 
 on:
-  schedule:
-    # 台灣 16:00 = UTC 08:00
-    - cron: "0 8 * * *"
-  workflow_dispatch:
+  workflow_dispatch
 
 jobs:
   run:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ 取 repo
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      # 2️⃣ Node
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      # 3️⃣ 安裝依賴
       - name: Install dependencies
         run: npm install
 
-      # 4️⃣ Playwright
       - name: Install Playwright
         run: npx playwright install --with-deps
 
