@@ -1,7 +1,10 @@
 name: daily-claim
 
 on:
-  workflow_dispatch
+  schedule:
+    # 台灣 16:00 = UTC 08:00
+    - cron: "0 8 * * *"
+  workflow_dispatch:
 
 jobs:
   run:
@@ -19,7 +22,7 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Install Playwright
+      - name: Install Playwright browsers
         run: npx playwright install --with-deps
 
       # =========================
@@ -45,3 +48,4 @@ jobs:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
           ACCOUNT_NAME: "食不食油餅"
         run: node claim.js
+        
