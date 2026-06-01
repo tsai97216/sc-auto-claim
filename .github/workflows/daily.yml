@@ -2,8 +2,7 @@ name: daily-claim
 
 on:
   schedule:
-    # 台灣 16:00 = UTC 08:00
-    - cron: "0 8 * * *"
+    - cron: "0 * * * *"   # 每小時
   workflow_dispatch:
 
 jobs:
@@ -48,4 +47,3 @@ jobs:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
           ACCOUNT_NAME: "食不食油餅"
         run: node claim.js
-        
