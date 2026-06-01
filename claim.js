@@ -22,7 +22,7 @@ function saveState(state) {
 }
 
 // ----------------------
-// 🧠 game_day (16:00切日)
+// 🧠 gameDay (16:00切日)
 // ----------------------
 function getGameDay() {
   const now = new Date();
@@ -87,27 +87,25 @@ async function notify(claimed, accountName, isSuccess) {
 // main
 // ----------------------
 (async () => {
-  let claimed = 0;
-
   const state = loadState();
   const gameDay = getGameDay();
 
-  // 🧠 新的一天自動重置
-  const isNewDay = state.gameDay !== gameDay;
-
-  if (isNewDay) {
+  // 🟢 換日重置
+  if (state.gameDay !== gameDay) {
     state.gameDay = gameDay;
     state.success = false;
     saveState(state);
   }
 
-  const alreadySuccess = state.success === true && state.gameDay === gameDay;
+  const alreadySuccess = state.success === true;
 
-  // 🔥 核心新增：成功後直接休眠（不跑 browser）
+  // 🟢 成功後：直接停止（不再開 browser）
   if (alreadySuccess) {
-    console.log(`😴 [${ACCOUNT_NAME}] 今日已成功，進入休眠模式直到下一個 gameDay`);
+    console.log(`😴 [${ACCOUNT_NAME}] 今日已成功，跳過執行`);
     return;
   }
+
+  let claimed = 0;
 
   const browser = await chromium.launch({ headless: true });
 
@@ -154,24 +152,24 @@ async function notify(claimed, accountName, isSuccess) {
 
     const isSuccess = claimed > 0;
 
-    // 🟢 成功：寫入鎖 + 通知一次
-    if (isSuccess && !state.success) {
-      await notify(claimed, ACCOUNT_NAME, true);
+    // 🟢 成功：寫入 + 通知一次
+    if (isSuccess) {
       state.success = true;
       saveState(state);
+
+      await notify(claimed, ACCOUNT_NAME, true);
     }
 
-    // 🔴 失敗：只有在尚未成功過時才通知
-    if (!isSuccess && !state.success) {
+    // 🔴 失敗：每次都通知（你已確認允許刷屏）
+    if (!isSuccess) {
       await notify(0, ACCOUNT_NAME, false);
     }
 
   } catch (err) {
     console.log("❌ error", err);
 
-    if (!state.success) {
-      await notify(0, ACCOUNT_NAME, false);
-    }
+    // 🔴 error 也算失敗通知
+    await notify(0, ACCOUNT_NAME, false);
 
   } finally {
     await browser.close();
