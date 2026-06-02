@@ -25,7 +25,7 @@ jobs:
         run: npx playwright install --with-deps
 
       # =========================
-      # 🟢 帳號 1
+      # 🟢 帳號 A
       # =========================
       - name: Restore auth A
         run: echo '${{ secrets.AUTH_STATE }}' > auth.json
@@ -34,10 +34,11 @@ jobs:
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
           ACCOUNT_NAME: "各位原住民同胞大家好"
+          ACCOUNT_ID: A
         run: node claim.js
 
       # =========================
-      # 🟢 帳號 2
+      # 🟢 帳號 B
       # =========================
       - name: Restore auth B
         run: echo '${{ secrets.AUTH_STATE_ALT }}' > auth.json
@@ -46,4 +47,19 @@ jobs:
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
           ACCOUNT_NAME: "食不食油餅"
+          ACCOUNT_ID: B
         run: node claim.js
+
+      # =========================
+      # 🟢 Commit state（關鍵）
+      # =========================
+      - name: Commit state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add claim_state_*.json
+
+          git diff --cached --quiet || git commit -m "update claim state"
+
+          git push
