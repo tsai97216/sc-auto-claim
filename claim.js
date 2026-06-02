@@ -3,8 +3,10 @@ const fs = require('fs');
 
 const DISCORD_WEBHOOK = process.env.DISCORD_WEBHOOK;
 const ACCOUNT_NAME = process.env.ACCOUNT_NAME || "Unknown";
+const ACCOUNT_ID = process.env.ACCOUNT_ID || "A";
 
-const STATE_FILE = './claim_state.json';
+// 🟢 每個帳號獨立 state
+const STATE_FILE = `./claim_state_${ACCOUNT_ID}.json`;
 
 // ----------------------
 // 🧠 state load/save
@@ -97,9 +99,9 @@ async function notify(claimed, accountName, isSuccess) {
     saveState(state);
   }
 
+  // 🟢 已成功 → 直接停機
   const alreadySuccess = state.success === true;
 
-  // 🟢 成功後：直接停止（不再開 browser）
   if (alreadySuccess) {
     console.log(`😴 [${ACCOUNT_NAME}] 今日已成功，跳過執行`);
     return;
@@ -152,7 +154,7 @@ async function notify(claimed, accountName, isSuccess) {
 
     const isSuccess = claimed > 0;
 
-    // 🟢 成功：寫入 + 通知一次
+    // 🟢 成功
     if (isSuccess) {
       state.success = true;
       saveState(state);
@@ -160,7 +162,7 @@ async function notify(claimed, accountName, isSuccess) {
       await notify(claimed, ACCOUNT_NAME, true);
     }
 
-    // 🔴 失敗：每次都通知（你已確認允許刷屏）
+    // 🔴 失敗（你允許每次都發）
     if (!isSuccess) {
       await notify(0, ACCOUNT_NAME, false);
     }
@@ -168,7 +170,6 @@ async function notify(claimed, accountName, isSuccess) {
   } catch (err) {
     console.log("❌ error", err);
 
-    // 🔴 error 也算失敗通知
     await notify(0, ACCOUNT_NAME, false);
 
   } finally {
