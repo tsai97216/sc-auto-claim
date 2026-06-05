@@ -118,11 +118,14 @@ async function notify(claimed, accountName, isSuccess) {
 
     const page = await context.newPage();
 
+    // 🔥 修正點：避免 networkidle 卡死
     await page.goto('https://store.supercell.com/brawlstars', {
-      waitUntil: 'networkidle'
+      waitUntil: 'domcontentloaded',
+      timeout: 60000
     });
 
-    await page.waitForTimeout(5000);
+    // 🔥 保險：讓 JS / API 多跑一下（不會卡死）
+    await page.waitForTimeout(5000).catch(() => {});
 
     console.log(`👉 [${ACCOUNT_NAME}] 開始掃描`);
 
