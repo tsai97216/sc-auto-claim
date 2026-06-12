@@ -62,7 +62,7 @@ async function notify(claimed, accountName, isSuccess) {
             name: "🎁 結果",
             value: isSuccess
               ? `成功領取 ${claimed} 個`
-              : "沒有可領取獎勵（監控中）",
+              : "沒有可領取獎勵（本次未成功）",
             inline: false
           }
         ],
@@ -99,11 +99,9 @@ async function notify(claimed, accountName, isSuccess) {
     saveState(state);
   }
 
-  // 🟢 已成功 → 直接停機
-  const alreadySuccess = state.success === true;
-
-  if (alreadySuccess) {
-    console.log(`😴 [${ACCOUNT_NAME}] 今日已成功，跳過執行`);
+  // 🟢 已成功 → 跳過
+  if (state.success === true) {
+    console.log(`😴 [${ACCOUNT_NAME}] 今日已成功，跳過`);
     return;
   }
 
@@ -118,14 +116,15 @@ async function notify(claimed, accountName, isSuccess) {
 
     const page = await context.newPage();
 
-    // 🔥 修正點：避免 networkidle 卡死
+    // 🔥 修正：避免 networkidle 卡死 + 保證 render 完成
     await page.goto('https://store.supercell.com/brawlstars', {
       waitUntil: 'domcontentloaded',
       timeout: 60000
     });
 
-    // 🔥 保險：讓 JS / API 多跑一下（不會卡死）
-    await page.waitForTimeout(5000).catch(() => {});
+    await page.waitForLoadState('networkidle').catch(() => {});
+    await page.waitForTimeout(8000);
+    await page.waitForSelector('button', { timeout: 15000 }).catch(() => {});
 
     console.log(`👉 [${ACCOUNT_NAME}] 開始掃描`);
 
@@ -157,24 +156,18 @@ async function notify(claimed, accountName, isSuccess) {
 
     const isSuccess = claimed > 0;
 
-    // 🟢 成功
     if (isSuccess) {
       state.success = true;
       saveState(state);
 
       await notify(claimed, ACCOUNT_NAME, true);
-    }
-
-    // 🔴 失敗（你允許每次都發）
-    if (!isSuccess) {
+    } else {
       await notify(0, ACCOUNT_NAME, false);
     }
 
   } catch (err) {
     console.log("❌ error", err);
-
     await notify(0, ACCOUNT_NAME, false);
-
   } finally {
     await browser.close();
   }
