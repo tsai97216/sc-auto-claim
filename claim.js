@@ -50,7 +50,9 @@ async function notify(claimed, accountName, isSuccess) {
   const payload = {
     embeds: [
       {
-        title: "🎮 荒野亂鬥自動領取",
+        title: isSuccess
+          ? "🎮 荒野亂鬥自動領取成功"
+          : "🎮 荒野亂鬥自動領取失敗",
         color: isSuccess ? 0x2ecc71 : 0xe74c3c,
         fields: [
           {
@@ -155,18 +157,25 @@ async function notify(claimed, accountName, isSuccess) {
     console.log(`✅ [${ACCOUNT_NAME}] 完成：${claimed}`);
 
     const isSuccess = claimed > 0;
+    const checkedAt = new Date().toISOString();
+
+    state.lastClaimAt = checkedAt;
+    state.lastResult = isSuccess ? "成功" : "失敗";
 
     if (isSuccess) {
       state.success = true;
-      saveState(state);
-
-      await notify(claimed, ACCOUNT_NAME, true);
-    } else {
-      await notify(0, ACCOUNT_NAME, false);
     }
+
+    saveState(state);
+    await notify(claimed, ACCOUNT_NAME, isSuccess);
 
   } catch (err) {
     console.log("❌ error", err);
+
+    state.lastClaimAt = new Date().toISOString();
+    state.lastResult = "失敗";
+    saveState(state);
+
     await notify(0, ACCOUNT_NAME, false);
   } finally {
     await browser.close();
