@@ -5,12 +5,8 @@ const DISCORD_WEBHOOK = process.env.DISCORD_WEBHOOK;
 const ACCOUNT_NAME = process.env.ACCOUNT_NAME || "Unknown";
 const ACCOUNT_ID = process.env.ACCOUNT_ID || "A";
 
-// 🟢 每個帳號獨立 state
 const STATE_FILE = `./claim_state_${ACCOUNT_ID}.json`;
 
-// ----------------------
-// 🧠 state load/save
-// ----------------------
 function loadState() {
   try {
     return JSON.parse(fs.readFileSync(STATE_FILE, 'utf-8'));
@@ -23,15 +19,10 @@ function saveState(state) {
   fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2));
 }
 
-// ----------------------
-// 🧠 gameDay (16:00切日)
-// ----------------------
 function getGameDay() {
   const now = new Date();
-
   const taiwanOffset = 8 * 60 * 60 * 1000;
   const local = new Date(now.getTime() + taiwanOffset);
-
   const hour = local.getUTCHours();
 
   if (hour < 16) {
@@ -41,9 +32,6 @@ function getGameDay() {
   return `${local.getUTCFullYear()}-${String(local.getUTCMonth() + 1).padStart(2, '0')}-${String(local.getUTCDate()).padStart(2, '0')}_16`;
 }
 
-// ----------------------
-// Discord notify
-// ----------------------
 async function notify(claimed, accountName, isSuccess) {
   if (!DISCORD_WEBHOOK) return;
 
@@ -87,28 +75,22 @@ async function notify(claimed, accountName, isSuccess) {
   }
 }
 
-// ----------------------
-// main
-// ----------------------
 (async () => {
   const state = loadState();
   const gameDay = getGameDay();
 
-  // 🟢 換日重置
   if (state.gameDay !== gameDay) {
     state.gameDay = gameDay;
     state.success = false;
     saveState(state);
   }
 
-  // 🟢 已成功 → 跳過
   if (state.success === true) {
     console.log(`😴 [${ACCOUNT_NAME}] 今日已成功，跳過`);
     return;
   }
 
   let claimed = 0;
-
   const browser = await chromium.launch({ headless: true });
 
   try {
@@ -118,7 +100,6 @@ async function notify(claimed, accountName, isSuccess) {
 
     const page = await context.newPage();
 
-    // 🔥 修正：避免 networkidle 卡死 + 保證 render 完成
     await page.goto('https://store.supercell.com/brawlstars', {
       waitUntil: 'domcontentloaded',
       timeout: 60000
@@ -167,6 +148,7 @@ async function notify(claimed, accountName, isSuccess) {
     }
 
     saveState(state);
+    console.log(`RESULT=${isSuccess ? "success" : "failure"}`);
     await notify(claimed, ACCOUNT_NAME, isSuccess);
 
   } catch (err) {
@@ -176,6 +158,7 @@ async function notify(claimed, accountName, isSuccess) {
     state.lastResult = "失敗";
     saveState(state);
 
+    console.log("RESULT=failure");
     await notify(0, ACCOUNT_NAME, false);
   } finally {
     await browser.close();
