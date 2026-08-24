@@ -35,7 +35,7 @@ jobs:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
           ACCOUNT_NAME: "各位原住民同胞大家好"
           ACCOUNT_ID: A
-        run: node claim.js
+        run: node claim.js | tee result_A.txt
 
       # =========================
       # 🟢 帳號 B
@@ -48,7 +48,7 @@ jobs:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
           ACCOUNT_NAME: "食不食油餅"
           ACCOUNT_ID: B
-        run: node claim.js
+        run: node claim.js | tee result_B.txt
 
       # =========================
       # 🟢 Update README
@@ -83,8 +83,23 @@ jobs:
               state = JSON.parse(fs.readFileSync(`claim_state_${id}.json`, 'utf8'));
             } catch {}
 
-            const result = state.lastResult === 'success' ? '成功' :
-              state.lastResult === 'failure' ? '失敗' : '尚無紀錄';
+            const resultFile = `result_${id}.txt`;
+            let output = '';
+            try {
+              output = fs.readFileSync(resultFile, 'utf8');
+            } catch {}
+
+            const matches = [...output.matchAll(/RESULT=(success|failure)/g)];
+            const latestResult = matches.length ? matches[matches.length - 1][1] : null;
+
+            if (latestResult === 'success') {
+              state.lastResult = '成功';
+            } else if (latestResult === 'failure') {
+              state.lastResult = '失敗';
+            }
+
+            const result = state.lastResult === '成功' ? '成功' :
+              state.lastResult === '失敗' ? '失敗' : '尚無紀錄';
 
             return `| ${name} | ${formatTime(state.lastClaimAt)} | ${result} |`;
           }).join('\n');
