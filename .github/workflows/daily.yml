@@ -2,13 +2,8 @@ name: daily-claim
 
 on:
   schedule:
-    # 每天台灣時間 15:00 啟動，避開整點高峰
-    - cron: "0 7 * * *"
+    - cron: "0 * * * *"   # 每小時
   workflow_dispatch:
-
-concurrency:
-  group: daily-claim
-  cancel-in-progress: false
 
 jobs:
   run:
@@ -30,70 +25,30 @@ jobs:
         run: npx playwright install --with-deps
 
       # =========================
-      # 🟢 Wait until claim window
+      # 🟢 帳號 A
       # =========================
-      - name: Wait until 15:55 Taiwan time
-        run: |
-          python3 - <<'PY'
-          import time
-          from datetime import datetime
-          from zoneinfo import ZoneInfo
+      - name: Restore auth A
+        run: echo '${{ secrets.AUTH_STATE }}' > auth.json
 
-          tz = ZoneInfo("Asia/Taipei")
-
-          while True:
-              now = datetime.now(tz)
-              target = now.replace(hour=15, minute=55, second=0, microsecond=0)
-
-              if now >= target:
-                  print(f"開始密集檢查：{now.strftime('%Y-%m-%d %H:%M:%S %Z')}")
-                  break
-
-              seconds = (target - now).total_seconds()
-              sleep_for = min(max(seconds, 1), 60)
-              print(f"目前 {now.strftime('%H:%M:%S')}，距離 15:55 還有 {int(seconds)} 秒")
-              time.sleep(sleep_for)
-          PY
+      - name: Run claim A
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          ACCOUNT_NAME: "各位原住民同胞大家好"
+          ACCOUNT_ID: A
+        run: node claim.js | tee result_A.txt
 
       # =========================
-      # 🟢 Repeated claim attempts
+      # 🟢 帳號 B
       # =========================
-      - name: Repeated claim until both accounts succeed
-        shell: bash
-        run: |
-          set -u
+      - name: Restore auth B
+        run: echo '${{ secrets.AUTH_STATE_ALT }}' > auth.json
 
-          MAX_ATTEMPTS=90
-          INTERVAL=120
-
-          for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
-            echo "=============================="
-            echo "第 $attempt 次檢查"
-            echo "=============================="
-
-            echo '${{ secrets.AUTH_STATE }}' > auth.json
-            ACCOUNT_NAME="各位原住民同胞大家好" ACCOUNT_ID=A \
-              DISCORD_WEBHOOK="${{ secrets.DISCORD_WEBHOOK }}" \
-              node claim.js | tee -a result_A.txt
-
-            echo '${{ secrets.AUTH_STATE_ALT }}' > auth.json
-            ACCOUNT_NAME="食不食油餅" ACCOUNT_ID=B \
-              DISCORD_WEBHOOK="${{ secrets.DISCORD_WEBHOOK }}" \
-              node claim.js | tee -a result_B.txt
-
-            success_a=$(node -e 'try { console.log(JSON.parse(require("fs").readFileSync("claim_state_A.json","utf8")).success === true ? "1" : "0") } catch { console.log("0") }')
-            success_b=$(node -e 'try { console.log(JSON.parse(require("fs").readFileSync("claim_state_B.json","utf8")).success === true ? "1" : "0") } catch { console.log("0") }')
-
-            if [ "$success_a" = "1" ] && [ "$success_b" = "1" ]; then
-              echo "🎉 兩個帳號都已成功領取，結束 workflow"
-              break
-            fi
-
-            if [ "$attempt" -lt "$MAX_ATTEMPTS" ]; then
-              echo "尚未全部成功，120 秒後再次檢查"
-              sleep "$INTERVAL"
-            fi
-          done
+      - name: Run claim B
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          ACCOUNT_NAME: "食不食油餅"
+          ACCOUNT_ID: B
+        run: node claim.js | tee result_B.txt
 
       # =========================
       # 🟢 Update README
@@ -125,10 +80,10 @@ jobs:
           const rows = accounts.map(({ name, id }) => {
             let state = {};
             try {
-              state = JSON.parse(fs.readFileSync('claim_state_' + id + '.json', 'utf8'));
+              state = JSON.parse(fs.readFileSync(`claim_state_${id}.json`, 'utf8'));
             } catch {}
 
-            const resultFile = 'result_' + id + '.txt';
+            const resultFile = `result_${id}.txt`;
             let output = '';
             try {
               output = fs.readFileSync(resultFile, 'utf8');
@@ -137,16 +92,19 @@ jobs:
             const matches = [...output.matchAll(/RESULT=(success|failure)/g)];
             const latestResult = matches.length ? matches[matches.length - 1][1] : null;
 
-            if (latestResult === 'success') state.lastResult = '成功';
-            else if (latestResult === 'failure') state.lastResult = '失敗';
+            if (latestResult === 'success') {
+              state.lastResult = '成功';
+            } else if (latestResult === 'failure') {
+              state.lastResult = '失敗';
+            }
 
             const result = state.lastResult === '成功' ? '成功' :
               state.lastResult === '失敗' ? '失敗' : '尚無紀錄';
 
-            return '| ' + name + ' | ' + formatTime(state.lastClaimAt) + ' | ' + result + ' |';
+            return `| ${name} | ${formatTime(state.lastClaimAt)} | ${result} |`;
           }).join('\n');
 
-          const readme = '# 荒野亂鬥自動領取\n\n| 帳號 | 上次簽到時間 | 簽到結果 |\n| --- | --- | --- |\n' + rows + '\n';
+          const readme = `# 荒野亂鬥自動領取\n\n| 帳號 | 上次簽到時間 | 簽到結果 |\n| --- | --- | --- |\n${rows}\n`;
           fs.writeFileSync('README.md', readme);
           NODE
 
